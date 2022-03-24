@@ -7,12 +7,12 @@ import (
 	"reflect"
 )
 
-type Pool[T comparable] struct {
+type Pool struct {
 	*pgxpool.Pool
 }
 
-func (p *Pool[T]) SelectMany(query string) (elements []*T) {
-	rows, err := p.Query(context.Background(), query)
+func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (elements []*T) {
+	rows, err := pool.Query(ctx, query)
 	if err != nil {
 		log.Fatal(err)
 	}
