@@ -1,4 +1,4 @@
-module selectify
+module github.com/JAbduvohidov/selectify
 
 go 1.18
 
