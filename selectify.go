@@ -3,7 +3,6 @@ package selectify
 import (
 	"context"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"log"
 	"reflect"
 )
 
@@ -11,10 +10,10 @@ type Pool struct {
 	*pgxpool.Pool
 }
 
-func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (elements []*T) {
+func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (elements []*T, err error) {
 	rows, err := pool.Query(ctx, query)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	for rows.Next() {
@@ -32,7 +31,7 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 
 			err = rows.Scan(items...)
 			if err != nil {
-				log.Fatal(err)
+				return
 			}
 
 			for i, item := range items {
@@ -41,7 +40,7 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 		default:
 			err = rows.Scan(&element)
 			if err != nil {
-				log.Fatal(err)
+				return
 			}
 		}
 
