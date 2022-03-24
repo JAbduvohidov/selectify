@@ -49,3 +49,35 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 
 	return
 }
+
+func SelectRow[T comparable](pool *Pool, ctx context.Context, query string) (*T, error) {
+	var element T
+	row := pool.QueryRow(ctx, query)
+
+	value := reflect.ValueOf(&element)
+	switch value.Elem().Kind() {
+	case reflect.Struct:
+		var items []interface{}
+
+		for i := 0; i < value.Elem().NumField(); i++ {
+			var v = value.Elem().Field(i).Interface()
+			items = append(items, &v)
+		}
+
+		err := row.Scan(items...)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, item := range items {
+			value.Elem().Field(i).Set(reflect.ValueOf(*item.(*interface{})))
+		}
+	default:
+		err := row.Scan(&element)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &element, nil
+}
