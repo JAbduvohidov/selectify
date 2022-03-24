@@ -2,12 +2,20 @@ package selectify
 
 import (
 	"context"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"reflect"
+
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type Pool struct {
 	*pgxpool.Pool
+}
+
+// Fielder is a wrapper of the Fields method.
+// Implement FieldSetter for improving CPU performance.
+type Fielder interface {
+	// Fields returns addresses of all fields of the struct.
+	Fields() []any
 }
 
 func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (elements []*T, err error) {
@@ -17,67 +25,56 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 	}
 
 	for rows.Next() {
-		var element T
-
-		value := reflect.ValueOf(&element)
-		switch value.Elem().Kind() {
-		case reflect.Struct:
-			var items []interface{}
-
-			for i := 0; i < value.Elem().NumField(); i++ {
-				var v = value.Elem().Field(i).Interface()
-				items = append(items, &v)
-			}
-
-			err = rows.Scan(items...)
-			if err != nil {
-				return
-			}
-
-			for i, item := range items {
-				value.Elem().Field(i).Set(reflect.ValueOf(*item.(*interface{})))
-			}
-		default:
-			err = rows.Scan(&element)
-			if err != nil {
-				return
-			}
+		element, err := scan[T](rows)
+		if err != nil {
+			return nil, err
 		}
-
-		elements = append(elements, &element)
+		elements = append(elements, element)
 	}
-
+	err = rows.Err()
 	return
 }
 
 func SelectRow[T comparable](pool *Pool, ctx context.Context, query string) (*T, error) {
-	var element T
 	row := pool.QueryRow(ctx, query)
+	return scan[T](row)
+}
 
-	value := reflect.ValueOf(&element)
-	switch value.Elem().Kind() {
-	case reflect.Struct:
-		var items []interface{}
+type scanner interface {
+	Scan(dest ...any) error
+}
 
-		for i := 0; i < value.Elem().NumField(); i++ {
-			var v = value.Elem().Field(i).Interface()
+func scan[T comparable](rows scanner) (*T, error) {
+	element := new(T)
+
+	if f, ok := any(element).(Fielder); ok {
+		// if element's type implements Fielder, then no need of using reflect package
+		err := rows.Scan(f.Fields()...)
+		if err != nil {
+			return nil, err
+		}
+	} else if value := reflect.ValueOf(element).Elem(); value.Kind() == reflect.Struct {
+		nf := value.NumField()
+		items := make([]any, 0, nf)
+
+		for i := 0; i < nf; i++ {
+			v := value.Field(i).Interface()
 			items = append(items, &v)
 		}
 
-		err := row.Scan(items...)
+		err := rows.Scan(items...)
 		if err != nil {
 			return nil, err
 		}
 
 		for i, item := range items {
-			value.Elem().Field(i).Set(reflect.ValueOf(*item.(*interface{})))
+			value.Field(i).Set(reflect.ValueOf(*item.(*interface{})))
 		}
-	default:
-		err := row.Scan(&element)
+	} else {
+		err := rows.Scan(element)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	return &element, nil
+	return element, nil
 }
