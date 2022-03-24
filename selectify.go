@@ -44,12 +44,12 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scan[T comparable](rows scanner) (*T, error) {
+func scan[T comparable](row scanner) (*T, error) {
 	element := new(T)
 
 	if f, ok := any(element).(Fielder); ok {
 		// if element's type implements Fielder, then no need of using reflect package
-		err := rows.Scan(f.Fields()...)
+		err := row.Scan(f.Fields()...)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func scan[T comparable](rows scanner) (*T, error) {
 			items = append(items, &v)
 		}
 
-		err := rows.Scan(items...)
+		err := row.Scan(items...)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func scan[T comparable](rows scanner) (*T, error) {
 			value.Field(i).Set(reflect.ValueOf(*item.(*interface{})))
 		}
 	} else {
-		err := rows.Scan(element)
+		err := row.Scan(element)
 		if err != nil {
 			return nil, err
 		}
