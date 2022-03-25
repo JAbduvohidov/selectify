@@ -7,10 +7,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-type Pool struct {
-	*pgxpool.Pool
-}
-
 // Fielder is a wrapper of the Fields method.
 // Implement FieldSetter for improving CPU performance.
 type Fielder interface {
@@ -18,11 +14,15 @@ type Fielder interface {
 	Fields() []any
 }
 
+type scanner interface {
+	Scan(dest ...any) error
+}
+
 // SelectMany selects the rows returned by the pool.Query and automatically maps it to your given type.
 // It returns a slice of the specified type with an error, if any.
 // The elements are nil if no rows are selected.
 // err returns the same errors as pool.Query.
-func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (elements []*T, err error) {
+func SelectMany[T comparable](pool *pgxpool.Pool, ctx context.Context, query string) (elements []*T, err error) {
 	rows, err := pool.Query(ctx, query)
 	if err != nil {
 		return
@@ -33,6 +33,7 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 		if err != nil {
 			return nil, err
 		}
+
 		elements = append(elements, element)
 	}
 	err = rows.Err()
@@ -41,13 +42,9 @@ func SelectMany[T comparable](pool *Pool, ctx context.Context, query string) (el
 
 // SelectRow selects the row returned by the pool.QueryRow and automatically maps it to your given type.
 // It returns pointer to the specified type with an error, if any.
-func SelectRow[T comparable](pool *Pool, ctx context.Context, query string) (*T, error) {
+func SelectRow[T comparable](pool *pgxpool.Pool, ctx context.Context, query string) (*T, error) {
 	row := pool.QueryRow(ctx, query)
 	return scan[T](row)
-}
-
-type scanner interface {
-	Scan(dest ...any) error
 }
 
 func scan[T comparable](row scanner) (*T, error) {
