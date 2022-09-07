@@ -18,11 +18,11 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-// SelectMany selects the rows returned by the pool.Query and automatically maps it to your given type.
+// Select selects the rows returned by the pool.Query and automatically maps it to your given type.
 // It returns a slice of the specified type with an error, if any.
 // The elements are nil if no rows are selected.
 // err returns the same errors as pool.Query.
-func SelectMany[T comparable](pool *pgxpool.Pool, ctx context.Context, query string, args ...any) (elements []*T, err error) {
+func Select[T comparable](pool *pgxpool.Pool, ctx context.Context, query string, args ...any) (elements []*T, err error) {
 	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
 		return
@@ -43,7 +43,7 @@ func SelectMany[T comparable](pool *pgxpool.Pool, ctx context.Context, query str
 // SelectRow selects the row returned by the pool.QueryRow and automatically maps it to your given type.
 // It returns pointer to the specified type with an error, if any.
 func SelectRow[T comparable](pool *pgxpool.Pool, ctx context.Context, query string, args ...any) (*T, error) {
-	row := pool.QueryRow(ctx, query, args)
+	row := pool.QueryRow(ctx, query, args...)
 	return scan[T](row)
 }
 
